@@ -1,0 +1,109 @@
+
+
+package game;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+public class NextRoomPanel extends JPanel implements Runnable, KeyListener {
+    private static final int WIDTH = 640;
+    private static final int HEIGHT = 480;
+
+    private BufferedImage background;
+    private Player player;
+    private Thread gameThread;
+    private final List<Rectangle> walls = new ArrayList<>();
+    private int shakeTimer = 0;
+    private final int shakeMagnitude = 4;
+
+    public NextRoomPanel() {
+        init();
+    }
+
+    private void init() {
+        setPreferredSize(new Dimension(WIDTH, HEIGHT));
+        setFocusable(true);
+        addKeyListener(this); // Add self as KeyListener
+
+        // Load room2 background
+        try {
+            background = ImageIO.read(getClass().getResourceAsStream("/assets/room2.png"));
+        } catch (IOException e) {
+            System.err.println("Failed to load room2 background.");
+        }
+
+        // Set up player
+        player = new Player(100, 100);
+
+        // Stop any leftover screen shake
+        shakeTimer = 0;
+
+        // Walls - same style as first room, but no middle holes
+         walls.clear();
+        walls.add(new Rectangle(0, 0, WIDTH, 75));
+        walls.add(new Rectangle(0, HEIGHT - 32, WIDTH, 32));
+        walls.add(new Rectangle(0, 0, 32, HEIGHT));
+        walls.add(new Rectangle(WIDTH - 32, 0, 32, HEIGHT));
+
+        gameThread = new Thread(this);
+        gameThread.start();
+    }
+
+    @Override
+    public void run() {
+        final double ns = 1_000_000_000.0 / 60;
+        long last = System.nanoTime();
+        while (true) {
+            long now = System.nanoTime();
+            while (now - last >= ns) {
+                update();
+                last += ns;
+            }
+            repaint();
+            try {
+                Thread.sleep(2);
+            } catch (InterruptedException ignored) {}
+        }
+    }
+
+    private void update() {
+        player.update(walls);
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2 = (Graphics2D) g;
+
+        int sx = 0, sy = 0;
+        if (shakeTimer > 0) {
+            sx = (int) (Math.random() * shakeMagnitude * 2) - shakeMagnitude;
+            sy = (int) (Math.random() * shakeMagnitude * 2) - shakeMagnitude;
+            shakeTimer--;
+        }
+
+        g2.translate(sx, sy);
+
+        if (background != null)
+            g2.drawImage(background, 0, 0, WIDTH, HEIGHT, null);
+
+        player.draw(g2);
+
+        g2.translate(-sx, -sy);
+    }
+
+    // KeyListener methods
+    @Override public void keyTyped(KeyEvent e) {}
+    @Override public void keyReleased(KeyEvent e) {
+        player.keyReleased(e);
+    }
+    @Override public void keyPressed(KeyEvent e) {
+        player.keyPressed(e);
+    }
+}
